@@ -6,6 +6,7 @@ import { numberToWords, generateSealCode, generateReferenceCode, formatCurrency 
 import { useAuthStore } from '../lib/store';
 import { Save, Send, ArrowLeft, Camera, Loader2, Check, Mic, MicOff, Volume2, Sparkles, AlertCircle, QrCode } from 'lucide-react';
 import { QRScannerModal } from '../components/QRScannerModal';
+import { ReceiptOCRSection } from '../components/ReceiptOCRSection';
 
 export const NewInvoice: React.FC = () => {
   const { user } = useAuthStore();
@@ -16,7 +17,6 @@ export const NewInvoice: React.FC = () => {
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [scanningReceipt, setScanningReceipt] = useState(false);
   const [isQRScannerOpen, setIsQRScannerOpen] = useState(false);
   const [existingInvoice, setExistingInvoice] = useState<Invoice | null>(null);
 
@@ -46,6 +46,7 @@ export const NewInvoice: React.FC = () => {
     verifiedById: '',
     approvedById: '',
     remarks: '',
+    attachments: [] as string[],
   });
 
   // Initialize Speech Recognition
@@ -293,49 +294,24 @@ export const NewInvoice: React.FC = () => {
     }
   }, [formData, loading, isEditing]);
 
-  const handleReceiptScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setScanningReceipt(true);
-    try {
-      const form = new FormData();
-      form.append('image', file);
-
-      const res = await fetch('/api/parse-receipt', {
-        method: 'POST',
-        body: form
-      });
-
-      if (!res.ok) throw new Error('Failed to parse receipt');
-      
-      const data = await res.json();
-      
-      let matchedSourceId = formData.expenseSourceId;
-      if (data.vendor) {
-        const found = expenseSources.find(es => 
-          es.name.toLowerCase().includes(data.vendor.toLowerCase()) || 
-          data.vendor.toLowerCase().includes(es.name.toLowerCase())
-        );
-        if (found) matchedSourceId = found.id;
-      }
-
-      setFormData(prev => ({
-        ...prev,
-        amount: data.amount ? String(data.amount) : prev.amount,
-        expenseSourceId: matchedSourceId,
-        remarks: prev.remarks ? `${prev.remarks} (Receipt Scanned: ${data.vendor}, ${data.date})` : `Receipt Scanned: ${data.vendor}, ${data.date}`
-      }));
-      
-      alert('Receipt scanned and fields populated successfully!');
-    } catch (error) {
-      console.error(error);
-      alert('Failed to scan receipt. Please check the image and try again.');
-    } finally {
-      setScanningReceipt(false);
-      // Reset input
-      e.target.value = '';
-    }
+  const handleApplyOCRData = (data: {
+    merchantId?: string;
+    categoryId?: string;
+    amount?: number;
+    purpose?: string;
+    date?: string;
+    receiptImage?: string;
+    remarks?: string;
+  }) => {
+    setFormData(prev => ({
+      ...prev,
+      amount: data.amount !== undefined ? String(data.amount) : prev.amount,
+      expenseSourceId: data.merchantId || prev.expenseSourceId,
+      paymentTypeId: data.categoryId || prev.paymentTypeId,
+      purpose: data.purpose ? (prev.purpose ? `${prev.purpose} | ${data.purpose}` : data.purpose) : prev.purpose,
+      remarks: data.remarks ? (prev.remarks ? `${prev.remarks} (${data.remarks})` : data.remarks) : prev.remarks,
+      attachments: data.receiptImage ? [...prev.attachments, data.receiptImage] : prev.attachments,
+    }));
   };
 
   const amountNumber = parseFloat(formData.amount) || 0;
@@ -428,26 +404,18 @@ export const NewInvoice: React.FC = () => {
               <QrCode className="w-4 h-4 text-accent-600" />
               <span>Scan QR Code</span>
             </button>
-
-            <div className="relative">
-              <input 
-                type="file" 
-                accept="image/*" capture="environment" 
-                onChange={handleReceiptScan} 
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                disabled={scanningReceipt}
-              />
-              <button 
-                type="button" 
-                className={`flex items-center gap-2 px-3.5 py-2 ${scanningReceipt ? 'bg-indigo-100 text-indigo-400' : 'bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100'} rounded-lg transition-colors text-xs font-semibold shadow-2xs`}
-              >
-                {scanningReceipt ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
-                {scanningReceipt ? 'Scanning...' : 'OCR Receipt'}
-              </button>
-            </div>
           </div>
         )}
       </div>
+
+      {/* Smart OCR Receipt Scanner Section */}
+      {!isEditing && (
+        <ReceiptOCRSection 
+          expenseSources={expenseSources}
+          paymentTypes={paymentTypes}
+          onApplyData={handleApplyOCRData}
+        />
+      )}
 
       <form className="bg-bg-panel rounded-xl shadow-sm border border-border-subtle overflow-hidden">
         <div className="p-6 md:p-8 space-y-8">

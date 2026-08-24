@@ -1,19 +1,106 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../lib/db';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { ExpenseSource, PaymentType, AccountTitle, Person } from '../types';
-import { Plus, Edit2, Trash2, X, Save, FileSpreadsheet, Download } from 'lucide-react';
+import { Plus, Edit2, Trash2, X, Save, FileSpreadsheet, Download, ChevronDown, Check } from 'lucide-react';
 import { useAuthStore } from '../lib/store';
 import { CsvImportModal, CsvTargetType } from '../components/CsvImportModal';
 
 type Tab = 'expenseSources' | 'paymentTypes' | 'accountTitles' | 'people';
 
+export const CSV_TEMPLATES_CONFIG: Record<string, { filename: string; title: string; headers: string[]; sample: string[][] }> = {
+  expenses: {
+    filename: 'expenses_bulk_import_template.csv',
+    title: 'Expenses / Invoices Bulk Import Template',
+    headers: ['Date', 'InvoiceNumber', 'ExpenseSource', 'PaymentType', 'AccountTitle', 'Purpose', 'Amount', 'Status', 'Remarks'],
+    sample: [
+      ['2026-08-20', 'WALTON-2026-001', 'WALTON HI-TECH INDUSTRIES PLC', 'UTILITY & INFRASTRUCTURE', 'General Reserve', 'Monthly Server Room Electricity & Backup UPS Maintenance', '15000', 'Approved', 'Authorized by management'],
+      ['2026-08-22', 'STARTECH-2026-042', 'Star Tech & Engineering Ltd', 'OFFICE SUPPLIES & HARDWARE', 'IT Infrastructure Fund', 'Procurement of high-speed SSD drives and Cat6 cables', '8500', 'Approved', 'IT Department requisition'],
+      ['2026-08-23', 'PETRO-2026-109', 'Apex Property Management', 'TRAVEL & LOGISTICS', 'Common Fund', 'Field operations fuel allowance and transport logistics', '4200', 'Pending', 'Awaiting review'],
+    ]
+  },
+  expenseSources: {
+    filename: 'vendors_expense_sources_template.csv',
+    title: 'Vendors & Expense Sources Template',
+    headers: ['Name', 'Description', 'Address', 'Status'],
+    sample: [
+      ['WALTON HI-TECH INDUSTRIES PLC', 'Product- Refrigerator & Appliances', 'Chandra, Gazipur', 'Active'],
+      ['Star Tech & Engineering Ltd', 'IT Equipment, Laptops & Accessories', 'Dhanmondi, Dhaka', 'Active'],
+      ['Dhaka Electric Supply Company', 'Utility Power Provider', 'Nikunja-2, Khilkhet, Dhaka', 'Active'],
+      ['Apex Property Management', 'Office Lease and Building Maintenance', 'Gulshan-1, Dhaka', 'Active'],
+    ]
+  },
+  paymentTypes: {
+    filename: 'expense_categories_payment_types_template.csv',
+    title: 'Expense Categories & Payment Types Template',
+    headers: ['Name', 'Description', 'Status'],
+    sample: [
+      ['UTILITY & INFRASTRUCTURE', 'Operational utilities, electric and cloud expenses', 'Active'],
+      ['OFFICE SUPPLIES & HARDWARE', 'IT hardware, furniture and office stationery', 'Active'],
+      ['SUBSCRIPTIONS & LICENSES', 'Recurring software, SaaS and internet subscriptions', 'Active'],
+      ['TRAVEL & LOGISTICS', 'Corporate travel, fuel and courier allowances', 'Active'],
+    ]
+  },
+  accountTitles: {
+    filename: 'account_titles_fund_template.csv',
+    title: 'Account Titles & Funds Template',
+    headers: ['Name', 'Description', 'Status'],
+    sample: [
+      ['General Reserve', 'Main reserve fund for operational expenses', 'Active'],
+      ['Common Fund', 'BOD Common Fund for corporate distributions', 'Active'],
+      ['IT Infrastructure Fund', 'Dedicated server, cloud & security budget', 'Active'],
+      ['Administrative Overhead', 'Daily facility and headquarters maintenance', 'Active'],
+    ]
+  },
+  people: {
+    filename: 'people_and_roles_template.csv',
+    title: 'Personnel & Workflow Roles Template',
+    headers: ['Name', 'OfficeId', 'Designation', 'Department', 'Email', 'Phone', 'IsPreparedBy', 'IsVerifiedBy', 'IsApprovedBy', 'IsReceivedBy', 'Status'],
+    sample: [
+      ['Sazzad Kabir', '7130', 'Manager', 'Finance & Accounts', 'sazzad@thirdeye.com', '+8801700000001', 'Yes', 'Yes', 'No', 'Yes', 'Active'],
+      ['Nazrul Islam Sarker', '303', 'AMD', 'Executive Board', 'nazrul@thirdeye.com', '+8801700000002', 'No', 'Yes', 'Yes', 'Yes', 'Active'],
+      ['Tanvir Hossain', '4021', 'Lead Systems Architect', 'IT Operations', 'tanvir@thirdeye.com', '+8801700000003', 'Yes', 'Yes', 'No', 'Yes', 'Active'],
+    ]
+  }
+};
+
+export const triggerCsvTemplateDownload = (key: string) => {
+  const tmpl = CSV_TEMPLATES_CONFIG[key] || CSV_TEMPLATES_CONFIG['expenses'];
+  const csvContent = [
+    tmpl.headers.join(','),
+    ...tmpl.sample.map(row => row.map(cell => `"${cell.replace(/"/g, '""')}"`).join(','))
+  ].join('\n');
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = tmpl.filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
+
 export const MasterData: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>('expenseSources');
   const [refresh, setRefresh] = useState(0);
   const [isCsvModalOpen, setIsCsvModalOpen] = useState(false);
+  const [isTemplateMenuOpen, setIsTemplateMenuOpen] = useState(false);
+  const templateMenuRef = useRef<HTMLDivElement>(null);
 
   const forceRefresh = () => setRefresh(r => r + 1);
+
+  // Click outside to close template menu
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (templateMenuRef.current && !templateMenuRef.current.contains(event.target as Node)) {
+        setIsTemplateMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
   
   return (
     <div className="space-y-6 pb-10">
@@ -22,7 +109,80 @@ export const MasterData: React.FC = () => {
           <h1 className="text-2xl font-bold text-text-base">Master Data Management</h1>
           <p className="text-text-muted">Manage system lookups, vendors, expense categories, funds, and organizational workflow roles.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Download CSV Template Dropdown / Action */}
+          <div className="relative" ref={templateMenuRef}>
+            <button
+              onClick={() => setIsTemplateMenuOpen(prev => !prev)}
+              className="flex items-center gap-2 px-3.5 py-2.5 bg-bg-panel hover:bg-bg-base text-text-base border border-border-subtle hover:border-accent-300 rounded-lg text-sm font-medium transition-colors shadow-2xs"
+              title="Download formatted CSV templates for bulk importing"
+            >
+              <Download className="w-4 h-4 text-accent-600" />
+              <span>Download CSV Template</span>
+              <ChevronDown className="w-3.5 h-3.5 text-text-muted" />
+            </button>
+
+            {isTemplateMenuOpen && (
+              <div className="absolute right-0 mt-2 w-72 bg-bg-panel rounded-xl shadow-xl border border-border-subtle z-50 p-2 animate-in fade-in zoom-in-95 duration-100">
+                <div className="px-3 py-2 border-b border-border-subtle mb-1">
+                  <p className="text-xs font-bold uppercase tracking-wider text-text-muted">Select CSV Template</p>
+                </div>
+                <div className="space-y-1 text-xs">
+                  <button
+                    onClick={() => {
+                      triggerCsvTemplateDownload('expenses');
+                      setIsTemplateMenuOpen(false);
+                    }}
+                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-accent-50 dark:hover:bg-accent-950/40 text-text-base font-semibold flex items-center justify-between transition-colors group"
+                  >
+                    <span>📊 Expense & Vouchers Template</span>
+                    <Download className="w-3.5 h-3.5 text-accent-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </button>
+                  <button
+                    onClick={() => {
+                      triggerCsvTemplateDownload('expenseSources');
+                      setIsTemplateMenuOpen(false);
+                    }}
+                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-accent-50 dark:hover:bg-accent-950/40 text-text-base font-medium flex items-center justify-between transition-colors group"
+                  >
+                    <span>🏢 Vendors & Sources Template</span>
+                    <Download className="w-3.5 h-3.5 text-accent-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </button>
+                  <button
+                    onClick={() => {
+                      triggerCsvTemplateDownload('paymentTypes');
+                      setIsTemplateMenuOpen(false);
+                    }}
+                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-accent-50 dark:hover:bg-accent-950/40 text-text-base font-medium flex items-center justify-between transition-colors group"
+                  >
+                    <span>🏷️ Expense Categories Template</span>
+                    <Download className="w-3.5 h-3.5 text-accent-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </button>
+                  <button
+                    onClick={() => {
+                      triggerCsvTemplateDownload('accountTitles');
+                      setIsTemplateMenuOpen(false);
+                    }}
+                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-accent-50 dark:hover:bg-accent-950/40 text-text-base font-medium flex items-center justify-between transition-colors group"
+                  >
+                    <span>💼 Account Titles & Funds Template</span>
+                    <Download className="w-3.5 h-3.5 text-accent-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </button>
+                  <button
+                    onClick={() => {
+                      triggerCsvTemplateDownload('people');
+                      setIsTemplateMenuOpen(false);
+                    }}
+                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-accent-50 dark:hover:bg-accent-950/40 text-text-base font-medium flex items-center justify-between transition-colors group"
+                  >
+                    <span>👥 Personnel & Roles Template</span>
+                    <Download className="w-3.5 h-3.5 text-accent-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
           <button
             onClick={() => setIsCsvModalOpen(true)}
             className="flex items-center gap-2 px-4 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-sm font-medium transition-colors shadow-sm"
@@ -46,6 +206,7 @@ export const MasterData: React.FC = () => {
               refresh={refresh} 
               onRefresh={forceRefresh} 
               onOpenCsv={() => setIsCsvModalOpen(true)} 
+              onDownloadTemplate={() => triggerCsvTemplateDownload('expenseSources')}
             />
           )}
           {activeTab === 'paymentTypes' && (
@@ -54,6 +215,7 @@ export const MasterData: React.FC = () => {
               refresh={refresh} 
               onRefresh={forceRefresh} 
               onOpenCsv={() => setIsCsvModalOpen(true)} 
+              onDownloadTemplate={() => triggerCsvTemplateDownload('paymentTypes')}
             />
           )}
           {activeTab === 'accountTitles' && (
@@ -62,6 +224,7 @@ export const MasterData: React.FC = () => {
               refresh={refresh} 
               onRefresh={forceRefresh} 
               onOpenCsv={() => setIsCsvModalOpen(true)} 
+              onDownloadTemplate={() => triggerCsvTemplateDownload('accountTitles')}
             />
           )}
           {activeTab === 'people' && (
@@ -69,6 +232,7 @@ export const MasterData: React.FC = () => {
               refresh={refresh} 
               onRefresh={forceRefresh} 
               onOpenCsv={() => setIsCsvModalOpen(true)} 
+              onDownloadTemplate={() => triggerCsvTemplateDownload('people')}
             />
           )}
         </div>
@@ -101,12 +265,14 @@ const GenericMasterDataTab = ({
   type, 
   refresh, 
   onRefresh, 
-  onOpenCsv 
+  onOpenCsv,
+  onDownloadTemplate
 }: { 
   type: 'expenseSources' | 'paymentTypes' | 'accountTitles', 
   refresh: number, 
   onRefresh: () => void,
-  onOpenCsv: () => void
+  onOpenCsv: () => void,
+  onDownloadTemplate?: () => void
 }) => {
   const [data, setData] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -164,6 +330,7 @@ const GenericMasterDataTab = ({
         onEdit={(row: any) => { setEditingData(row); setIsModalOpen(true); }}
         onDelete={handleDelete}
         onOpenCsv={onOpenCsv}
+        onDownloadTemplate={onDownloadTemplate}
       />
       {isModalOpen && (
         <MasterDataModal 
@@ -189,11 +356,13 @@ const GenericMasterDataTab = ({
 const PeopleTab = ({ 
   refresh, 
   onRefresh, 
-  onOpenCsv 
+  onOpenCsv,
+  onDownloadTemplate
 }: { 
   refresh: number, 
   onRefresh: () => void,
-  onOpenCsv: () => void
+  onOpenCsv: () => void,
+  onDownloadTemplate?: () => void
 }) => {
   const [data, setData] = useState<Person[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -252,6 +421,7 @@ const PeopleTab = ({
         onEdit={(row: any) => { setEditingData(data.find(d => d.id === row.id) || null); setIsModalOpen(true); }}
         onDelete={handleDelete}
         onOpenCsv={onOpenCsv}
+        onDownloadTemplate={onDownloadTemplate}
       />
       {isModalOpen && (
         <PersonModal 
@@ -273,7 +443,7 @@ const PeopleTab = ({
 };
 
 
-const DataTable = ({ columns, data, hideDefault = false, onAdd, onEdit, onDelete, onOpenCsv }: any) => {
+const DataTable = ({ columns, data, hideDefault = false, onAdd, onEdit, onDelete, onOpenCsv, onDownloadTemplate }: any) => {
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
@@ -281,17 +451,27 @@ const DataTable = ({ columns, data, hideDefault = false, onAdd, onEdit, onDelete
           <h3 className="text-lg font-semibold text-text-base">Configured Records ({data.length})</h3>
           <p className="text-xs text-text-muted">Select an entry to edit or use bulk import to add multiple items at once.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
+          {onDownloadTemplate && (
+            <button 
+              onClick={onDownloadTemplate} 
+              className="flex items-center gap-1.5 px-3 py-2 bg-bg-base border border-border-subtle text-text-base rounded-lg hover:bg-bg-panel hover:border-accent-300 transition-colors text-xs font-semibold shadow-2xs"
+              title="Download empty CSV template for this tab"
+            >
+              <Download className="w-3.5 h-3.5 text-accent-600" />
+              <span>CSV Template</span>
+            </button>
+          )}
           {onOpenCsv && (
             <button 
               onClick={onOpenCsv} 
-              className="flex items-center gap-2 px-3.5 py-2 bg-bg-base border border-border-subtle text-text-base rounded-lg hover:bg-bg-panel hover:border-accent-300 transition-colors text-sm font-medium shadow-2xs"
+              className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg hover:bg-emerald-100 transition-colors text-xs font-semibold shadow-2xs"
             >
-              <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
               <span>Import CSV</span>
             </button>
           )}
-          <button onClick={onAdd} className="flex items-center gap-2 px-4 py-2 bg-accent-600 text-white rounded-lg hover:bg-accent-700 transition-colors text-sm font-medium shadow-sm">
+          <button onClick={onAdd} className="flex items-center gap-1.5 px-3.5 py-2 bg-accent-600 text-white rounded-lg hover:bg-accent-700 transition-colors text-xs font-semibold shadow-sm">
             <Plus className="w-4 h-4" /> Add New
           </button>
         </div>

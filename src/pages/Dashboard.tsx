@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { 
   FileText, CheckCircle, Clock, TrendingUp, Mic, Square, Loader2, 
   BarChart3, PieChart as PieChartIcon, Layers, Building2, Tag, Calendar, ChevronRight,
-  ArrowUpRight, DollarSign, Wallet
+  ArrowUpRight, DollarSign, Wallet, Download, FileSpreadsheet
 } from 'lucide-react';
 import { 
   PieChart as RechartsPie, Pie, Cell, ResponsiveContainer, Tooltip 
@@ -12,6 +12,7 @@ import { Invoice, ExpenseSource, PaymentType } from '../types';
 import { formatCurrency } from '../lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { MonthlyExpenseTrendsChart } from '../components/MonthlyExpenseTrendsChart';
+import { MonthlyAnalyticsExportModal } from '../components/MonthlyAnalyticsExportModal';
 
 type DistributionMode = 'category' | 'vendor';
 
@@ -25,6 +26,7 @@ export const Dashboard: React.FC = () => {
   const [sources, setSources] = useState<ExpenseSource[]>([]);
   const [types, setTypes] = useState<PaymentType[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
   // Distribution Chart Controls
   const [distributionMode, setDistributionMode] = useState<DistributionMode>('category');
@@ -178,22 +180,34 @@ export const Dashboard: React.FC = () => {
           <p className="text-text-muted text-sm">Real-time financial analytics, monthly expense trends, and requisitions.</p>
         </div>
         
-        {/* Quick Add Voice Feature */}
-        <div className="flex items-center gap-3 bg-bg-panel p-2 rounded-xl shadow-sm border border-border-subtle w-full sm:w-auto justify-between sm:justify-start">
-          <div className="px-2 text-xs font-semibold text-text-muted uppercase tracking-wider hidden sm:block">Voice Requisition</div>
-          {isRecording ? (
-            <button onClick={stopRecording} className="flex-1 sm:flex-initial flex items-center justify-center gap-2 bg-red-100 text-red-600 px-4 py-2 rounded-lg font-medium animate-pulse text-sm">
-              <Square className="w-4 h-4 fill-current" /> Stop Recording
-            </button>
-          ) : isProcessingVoice ? (
-            <button disabled className="flex-1 sm:flex-initial flex items-center justify-center gap-2 bg-accent-100 text-accent-700 px-4 py-2 rounded-lg font-medium text-sm">
-              <Loader2 className="w-4 h-4 animate-spin" /> Processing AI...
-            </button>
-          ) : (
-            <button onClick={startRecording} className="flex-1 sm:flex-initial flex items-center justify-center gap-2 bg-accent-600 hover:bg-accent-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm text-sm">
-              <Mic className="w-4 h-4" /> Start Voice Requisition
-            </button>
-          )}
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+          {/* Export Monthly Analytics Button */}
+          <button
+            onClick={() => setIsExportModalOpen(true)}
+            className="flex items-center gap-2 px-3.5 py-2.5 bg-bg-panel hover:bg-bg-base text-text-base border border-border-subtle hover:border-accent-300 rounded-xl text-sm font-semibold transition-colors shadow-2xs"
+            title="Export monthly expense reports in PDF or CSV format for accounting"
+          >
+            <Download className="w-4 h-4 text-accent-600" />
+            <span>Export Monthly Reports</span>
+          </button>
+
+          {/* Quick Add Voice Feature */}
+          <div className="flex items-center gap-3 bg-bg-panel p-2 rounded-xl shadow-sm border border-border-subtle flex-1 sm:flex-initial justify-between sm:justify-start">
+            <div className="px-2 text-xs font-semibold text-text-muted uppercase tracking-wider hidden sm:block">Voice Requisition</div>
+            {isRecording ? (
+              <button onClick={stopRecording} className="flex-1 sm:flex-initial flex items-center justify-center gap-2 bg-red-100 text-red-600 px-4 py-2 rounded-lg font-medium animate-pulse text-sm">
+                <Square className="w-4 h-4 fill-current" /> Stop Recording
+              </button>
+            ) : isProcessingVoice ? (
+              <button disabled className="flex-1 sm:flex-initial flex items-center justify-center gap-2 bg-accent-100 text-accent-700 px-4 py-2 rounded-lg font-medium text-sm">
+                <Loader2 className="w-4 h-4 animate-spin" /> Processing AI...
+              </button>
+            ) : (
+              <button onClick={startRecording} className="flex-1 sm:flex-initial flex items-center justify-center gap-2 bg-accent-600 hover:bg-accent-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm text-sm">
+                <Mic className="w-4 h-4" /> Start Voice Requisition
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -389,6 +403,15 @@ export const Dashboard: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Monthly Analytics Export Modal (PDF / CSV) */}
+      <MonthlyAnalyticsExportModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        invoices={invoices}
+        sources={sources}
+        paymentTypes={types}
+      />
     </div>
   );
 };
