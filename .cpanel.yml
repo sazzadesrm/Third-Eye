@@ -1,1 +1,5 @@
-.cpanel.yml
+---
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home/unlimitedplansazzadkabir.ss/sazzad.co.place/public_html/
+    - /bin/cp -R . "$DEPLOYPATH"
