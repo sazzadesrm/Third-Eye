@@ -1,0 +1,16 @@
+{
+  "name": "WHIPLC MISC Approval System",
+  "short_name": "WHIPLC MISC",
+  "description": "Miscellaneous Expense & Money Requisition Approval System",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1e3a8a",
+  "icons": [
+    {
+      "src": "/vite.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Third Eye Expense & Invoice Management",
+  "description": "Enterprise miscellaneous expense vouchers and invoice management system with recurring schedules, CSV bulk master data import, backup reminders, and monthly expense analytics.",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
