@@ -225,13 +225,16 @@ export const Header: React.FC<HeaderProps> = ({
     // 1. Invoices
     if (selectedFilter === 'all' || selectedFilter === 'invoices') {
       invoices.forEach(inv => {
+        const vendor = expenseSources.find(s => s.id === inv.expenseSourceId);
         const matches = (
           inv.invoiceNumber.toLowerCase().includes(q) ||
           inv.purpose.toLowerCase().includes(q) ||
           (inv.remarks && inv.remarks.toLowerCase().includes(q)) ||
           inv.amount.toString().includes(q) ||
           inv.status.toLowerCase().includes(q) ||
-          inv.sealCode.toLowerCase().includes(q)
+          inv.sealCode.toLowerCase().includes(q) ||
+          inv.date.includes(q) ||
+          (vendor && vendor.name.toLowerCase().includes(q))
         );
         if (matches) {
           results.push({
