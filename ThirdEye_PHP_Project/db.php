@@ -1,9 +1,9 @@
 <?php
 // Starthost Database Configuration
 $host = 'localhost';
-$dbname = 'thirdeye_db'; // Update with your Starthost Database Name
-$username = 'root';      // Update with your Starthost Database User
-$password = '';          // Update with your Starthost Database Password
+$dbname = 'third_eye-35303839b461'; // Update with your Starthost Database Name
+$username = 'third_eye';      // Update with your Starthost Database User
+$password = 'K=(£Vv£f?/@(';          // Update with your Starthost Database Password
 
 try {
     $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8", $username, $password);
