@@ -1,6 +1,4 @@
 -- Third Eye System - SQL Schema
-CREATE DATABASE IF NOT EXISTS thirdeye_db;
-USE thirdeye_db;
 
 CREATE TABLE users (
     id INT AUTO_INCREMENT PRIMARY KEY,
