@@ -1,6 +1,6 @@
 -- Third Eye System - SQL Schema
 
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     email VARCHAR(100) UNIQUE NOT NULL,
@@ -9,25 +9,25 @@ CREATE TABLE users (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE concernpersons (
+CREATE TABLE IF NOT EXISTS concernpersons (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     status ENUM('active', 'inactive') DEFAULT 'active'
 );
 
-CREATE TABLE expenselists (
+CREATE TABLE IF NOT EXISTS expenselists (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     status ENUM('active', 'inactive') DEFAULT 'active'
 );
 
-CREATE TABLE paymentlists (
+CREATE TABLE IF NOT EXISTS paymentlists (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     status ENUM('active', 'inactive') DEFAULT 'active'
 );
 
-CREATE TABLE mraforms (
+CREATE TABLE IF NOT EXISTS mraforms (
     id INT AUTO_INCREMENT PRIMARY KEY,
     invoice_number VARCHAR(50) UNIQUE NOT NULL,
     date DATE NOT NULL,
@@ -52,7 +52,7 @@ CREATE TABLE mraforms (
     FOREIGN KEY (received_by) REFERENCES users(id) ON DELETE SET NULL
 );
 
-CREATE TABLE audit_logs (
+CREATE TABLE IF NOT EXISTS audit_logs (
     id INT AUTO_INCREMENT PRIMARY KEY,
     mra_id INT,
     user_id INT,
@@ -66,5 +66,5 @@ CREATE TABLE audit_logs (
 );
 
 -- Seed Data (Password is 'password')
-INSERT INTO users (name, email, password, role) VALUES 
+INSERT IGNORE INTO users (name, email, password, role) VALUES 
 ('Super Admin', 'admin@whiplc.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Super Admin');
